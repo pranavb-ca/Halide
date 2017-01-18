@@ -700,6 +700,7 @@ protected:
     virtual void visit(const Block *);
     virtual void visit(const IfThenElse *);
     virtual void visit(const Evaluate *);
+    virtual void visit(const AddressOf *);
 };
 
 Stmt IRFilter::mutate(Expr e) {
@@ -788,6 +789,24 @@ void IRFilter::visit(const Broadcast *op) {
 }
 
 void IRFilter::visit(const Call *op) {
+    std::vector<Stmt> new_args(op->args.size());
+
+    // Mutate the args
+    for (size_t i = 0; i < op->args.size(); i++) {
+        Expr old_arg = op->args[i];
+        Stmt new_arg = mutate(old_arg);
+        new_args[i] = new_arg;
+    }
+
+    stmt = Stmt();
+    for (size_t i = 0; i < new_args.size(); ++i) {
+        if (new_args[i].defined()) {
+            stmt = make_block(new_args[i], stmt);
+        }
+    }
+}
+
+void IRFilter::visit(const AddressOf *op) {
     std::vector<Stmt> new_args(op->args.size());
 
     // Mutate the args

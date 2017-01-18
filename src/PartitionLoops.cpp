@@ -230,6 +230,16 @@ class ExprUsesInvalidBuffers : public IRVisitor {
             IRVisitor::visit(op);
         }
     }
+
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+        if (invalid_buffers.contains(op->name)) {
+            invalid = true;
+        } else {
+            IRVisitor::visit(op);
+        }
+    }
 public:
     ExprUsesInvalidBuffers(const Scope<int> &buffers) : invalid_buffers(buffers), invalid(false) {}
     bool invalid;

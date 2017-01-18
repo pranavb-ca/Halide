@@ -36,6 +36,16 @@ public:
         }
 
     }
+
+    void visit(const AddressOf *op) {
+        IRVisitor::visit(op);
+
+        if (op->func.defined()) {
+            Function f(op->func);
+            include_function(f);
+        }
+
+    }
 };
 
 void populate_environment(Function f, map<string, Function> &env, bool recursive = true) {

@@ -204,6 +204,21 @@ void CodeGen_GLSLBase::visit(const Call *op) {
     print_assignment(op->type, rhs.str());
 }
 
+void CodeGen_GLSLBase::visit(const AddressOf *op) {
+    ostringstream rhs;
+    if (builtin.count(op->name) == 0) {
+        user_error << "GLSL: unknown function '" << op->name << "' encountered.\n";
+    }
+
+    rhs << builtin[op->name] << "(";
+    for (size_t i = 0; i < op->args.size(); i++) {
+        if (i > 0) rhs << ", ";
+        rhs << print_expr(op->args[i]);
+    }
+    rhs << ")";
+    print_assignment(op->type, rhs.str());
+}
+
 string CodeGen_GLSLBase::print_type(Type type, AppendSpaceIfNeeded space_option) {
     ostringstream oss;
     type = map_type(type);

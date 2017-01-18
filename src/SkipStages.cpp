@@ -212,27 +212,18 @@ private:
         visit_conditional(op->condition, op->then_case, op->else_case);
     }
 
-    void visit(const Call *op) {
-        // Calls inside of an address_of aren't considered, because no
+    void visit(const AddressOf *op) {
+        // Calls inside of an AddressOf aren't considered, because no
         // actuall call to the Func happens.
-        if (op->is_intrinsic(Call::address_of)) {
-            // Visit the args of the inner call
-            const Call *c = op->args[0].as<Call>();
-            if (c) {
-                varies |= varying.contains(c->name);
-                for (size_t i = 0; i < c->args.size(); i++) {
-                    c->args[i].accept(this);
-                }
-            } else {
-                const Load *l = op->args[0].as<Load>();
 
-                internal_assert(l);
-                varies |= varying.contains(l->name);
-                l->index.accept(this);
-            }
-            return;
+        // Visit the args of the inner call
+        varies |= varying.contains(op->name);
+        for (size_t i = 0; i < op->args.size(); i++) {
+            op->args[i].accept(this);
         }
+    }
 
+    void visit(const Call *op) {
         varies |= in_pipeline.contains(op->name);
 
         IRVisitor::visit(op);
@@ -418,25 +409,17 @@ class MightBeSkippable : public IRVisitor {
 
     using IRVisitor::visit;
 
-    void visit(const Call *op) {
-        // Calls inside of an address_of aren't considered, because no
+    void visit(const AddressOf *op) {
+        // Calls inside of an AddressOf aren't considered, because no
         // actuall call to the Func happens.
-        if (op->is_intrinsic(Call::address_of)) {
-            // Visit the args of the inner call
-            internal_assert(op->args.size() == 1);
-            const Call *c = op->args[0].as<Call>();
-            if (c) {
-                for (size_t i = 0; i < c->args.size(); i++) {
-                    c->args[i].accept(this);
-                }
-            } else {
-                const Load *l = op->args[0].as<Load>();
 
-                internal_assert(l);
-                l->index.accept(this);
-            }
-            return;
+        // Visit the args of the inner call
+        for (size_t i = 0; i < op->args.size(); i++) {
+            op->args[i].accept(this);
         }
+    }
+
+    void visit(const Call *op) {
         IRVisitor::visit(op);
         if (op->name == func || extern_call_uses_buffer(op, func)) {
             result &= guarded;

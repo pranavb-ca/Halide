@@ -385,8 +385,7 @@ Stmt build_produce(Function f, const Target &target) {
                     string var = stage_name + f_args[k];
                     top_left.push_back(Variable::make(Int(32), var + ".min"));
                 }
-                Expr host_ptr = Call::make(f, top_left, j);
-                host_ptr = Call::make(Handle(), Call::address_of, {host_ptr}, Call::Intrinsic);
+                Expr host_ptr = AddressOf::make(Handle(), f, top_left, j);
 
                 BufferBuilder builder;
                 builder.host = host_ptr;

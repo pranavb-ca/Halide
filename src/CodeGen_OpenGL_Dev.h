@@ -75,6 +75,7 @@ protected:
     void visit(const GE *);
 
     void visit(const Shuffle *);
+    void visit(const AddressOf *);
 
 private:
     std::map<std::string, std::string> builtin;

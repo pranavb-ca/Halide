@@ -78,6 +78,18 @@ class IsBufferConstant : public IRVisitor {
         }
     }
 
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+        if (op->name == buffer &&
+            !CodeGen_GPU_Dev::is_block_uniform(op->args[0])) {
+            result = false;
+        }
+        if (result) {
+            IRVisitor::visit(op);
+        }
+    }
+
 public:
     bool result;
     const std::string &buffer;

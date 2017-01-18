@@ -246,6 +246,31 @@ Expr Load::make(Type type, std::string name, Expr index, Buffer<> image, Paramet
     return node;
 }
 
+Expr AddressOf::make(Type type, Function func, const std::vector<Expr> &args, int idx) {
+    internal_assert(idx >= 0 &&
+                    idx < func.outputs())
+        << "Value index out of range in address of a call to halide function\n";
+    internal_assert(func.has_pure_definition() || func.has_extern_definition())
+        << "Call to undefined halide function\n";
+    return make(type, func.name(), args, Buffer<>(), Parameter(), func.get_contents(), idx);
+}
+
+Expr AddressOf::make(Type type, std::string name, const std::vector<Expr> &args,
+                     Buffer<> image, Parameter param,
+                     IntrusivePtr<FunctionContents> func, int value_index) {
+    internal_assert(type.is_handle()) << "AddressOf must return a Handle type\n";
+
+    AddressOf *node = new AddressOf;
+    node->type = type;
+    node->name = name;
+    node->args = args;
+    node->func = func;
+    node->value_index = value_index;
+    node->image = image;
+    node->param = param;
+    return node;
+}
+
 Expr Ramp::make(Expr base, Expr stride, int lanes) {
     internal_assert(base.defined()) << "Ramp of undefined\n";
     internal_assert(stride.defined()) << "Ramp of undefined\n";
@@ -725,6 +750,7 @@ template<> void ExprNode<Ramp>::accept(IRVisitor *v) const { v->visit((const Ram
 template<> void ExprNode<Broadcast>::accept(IRVisitor *v) const { v->visit((const Broadcast *)this); }
 template<> void ExprNode<Call>::accept(IRVisitor *v) const { v->visit((const Call *)this); }
 template<> void ExprNode<Shuffle>::accept(IRVisitor *v) const { v->visit((const Shuffle *)this); }
+template<> void ExprNode<AddressOf>::accept(IRVisitor *v) const { v->visit((const AddressOf *)this); }
 template<> void ExprNode<Let>::accept(IRVisitor *v) const { v->visit((const Let *)this); }
 template<> void StmtNode<LetStmt>::accept(IRVisitor *v) const { v->visit((const LetStmt *)this); }
 template<> void StmtNode<AssertStmt>::accept(IRVisitor *v) const { v->visit((const AssertStmt *)this); }
@@ -755,7 +781,6 @@ Call::ConstString Call::popcount = "popcount";
 Call::ConstString Call::count_leading_zeros = "count_leading_zeros";
 Call::ConstString Call::count_trailing_zeros = "count_trailing_zeros";
 Call::ConstString Call::undef = "undef";
-Call::ConstString Call::address_of = "address_of";
 Call::ConstString Call::return_second = "return_second";
 Call::ConstString Call::if_then_else = "if_then_else";
 Call::ConstString Call::glsl_texture_load = "glsl_texture_load";

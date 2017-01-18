@@ -211,6 +211,39 @@ struct Load : public ExprNode<Load> {
     static const IRNodeType _type_info = IRNodeType::Load;
 };
 
+/** Address of a load or call to a Halide function. */
+struct AddressOf : public ExprNode<AddressOf> {
+    std::string name;
+    std::vector<Expr> args;
+
+    // If it's an address of a call to another halide function, this node holds
+    // onto a pointer to that function for the purposes of reference counting
+    // only. Self-references in update definitions do not have this set,
+    // to avoid cycles.
+    IntrusivePtr<FunctionContents> func;
+
+    // If that function has multiple values, which value does this
+    // call node refer to?
+    int value_index;
+
+    // If it's an address of a load from an image argument or compiled-in
+    // constant image, this will point to that
+    Buffer<> image;
+
+    // If it's an address of a load from an image parameter, this points to that
+    Parameter param;
+
+    EXPORT static Expr make(Type type, std::string name, const std::vector<Expr> &args,
+                            Buffer<> image = Buffer<>(), Parameter param = Parameter(),
+                            IntrusivePtr<FunctionContents> func = nullptr, int value_index = 0);
+
+    /** Convenience constructor for address of a call to other halide functions */
+    EXPORT static Expr make(Type type, Function func, const std::vector<Expr> &args, int idx = 0);
+
+    static const IRNodeType _type_info = IRNodeType::AddressOf;
+};
+
+
 /** A linear ramp vector node. This is vector with 'lanes' elements,
  * where element i is 'base' + i*'stride'. This is a convenient way to
  * pass around vectors without busting them up into individual
@@ -476,7 +509,6 @@ struct Call : public ExprNode<Call> {
         count_leading_zeros,
         count_trailing_zeros,
         undef,
-        address_of,
         return_second,
         if_then_else,
         glsl_texture_load,

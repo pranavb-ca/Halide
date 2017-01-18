@@ -231,6 +231,25 @@ void IRVisitor::visit(const Shuffle *op) {
     }
 }
 
+void IRVisitor::visit(const AddressOf *op) {
+    for (size_t i = 0; i < op->args.size(); i++) {
+        op->args[i].accept(this);
+    }
+
+    // Consider extern call args
+    if (op->func.defined()) {
+        Function f(op->func);
+        if (f.has_extern_definition()) {
+            for (size_t i = 0; i < f.extern_arguments().size(); i++) {
+                ExternFuncArgument arg = f.extern_arguments()[i];
+                if (arg.is_expr()) {
+                    arg.expr.accept(this);
+                }
+            }
+        }
+    }
+}
+
 void IRGraphVisitor::include(const Expr &e) {
     if (visited.count(e.get())) {
         return;
@@ -458,6 +477,12 @@ void IRGraphVisitor::visit(const Evaluate *op) {
 void IRGraphVisitor::visit(const Shuffle *op) {
     for (Expr i : op->vectors) {
         include(i);
+    }
+}
+
+void IRGraphVisitor::visit(const AddressOf *op) {
+    for (size_t i = 0; i < op->args.size(); i++) {
+        include(op->args[i]);
     }
 }
 

@@ -53,6 +53,15 @@ private:
         IRVisitor::visit(call);
     }
 
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+        if (func == op->name) {
+            last_use = containing_stmt;
+        }
+        IRVisitor::visit(op);
+    }
+
     void visit(const Store *store) {
         if (func == store->name) {
             last_use = containing_stmt;

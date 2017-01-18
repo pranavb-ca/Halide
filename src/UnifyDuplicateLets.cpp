@@ -47,8 +47,17 @@ protected:
 
     // Can't unify lets where the RHS might be not be pure
     bool is_impure;
+
     void visit(const Call *op) {
         is_impure |= !op->is_pure();
+        IRMutator::visit(op);
+    }
+
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+        is_impure |= ((op->name == producing) ||
+                      starts_with(op->name + ".", producing));
         IRMutator::visit(op);
     }
 

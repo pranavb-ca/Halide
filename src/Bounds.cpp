@@ -991,29 +991,20 @@ private:
 
     using IRGraphVisitor::visit;
 
-    void visit(const Call *op) {
+    void visit(const AddressOf *op) {
         if (!consider_calls) return;
 
-        // Calls inside of an address_of aren't touched, because no
+        // Calls inside of an AddressOf aren't touched, because no
         // actual memory access takes place.
-        if (op->is_intrinsic(Call::address_of)) {
-            // Visit the args of the inner call
-            internal_assert(op->args.size() == 1);
-            const Call *c = op->args[0].as<Call>();
 
-            if (c) {
-                for (size_t i = 0; i < c->args.size(); i++) {
-                    c->args[i].accept(this);
-                }
-            } else {
-                const Load *l = op->args[0].as<Load>();
-
-                internal_assert(l);
-                l->index.accept(this);
-            }
-
-            return;
+        // Visit the args of the inner call
+        for (size_t i = 0; i < op->args.size(); i++) {
+            op->args[i].accept(this);
         }
+    }
+
+    void visit(const Call *op) {
+        if (!consider_calls) return;
 
         if (op->is_intrinsic(Call::if_then_else)) {
             assert(op->args.size() == 3);

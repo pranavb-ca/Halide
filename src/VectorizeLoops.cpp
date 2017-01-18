@@ -337,6 +337,12 @@ class PredicateLoadStore : public IRMutator {
         IRMutator::visit(op);
     }
 
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+        IRMutator::visit(op);
+    }
+
 public:
     PredicateLoadStore(string v, Expr vpred, bool in_hexagon, const Target &t) :
             var(v), vector_predicate(vpred), in_hexagon(in_hexagon), target(t),

@@ -173,6 +173,27 @@ private:
         }
     }
 
+    void visit(const AddressOf *op) {
+        vector<Expr> new_args(op->args.size());
+        bool changed = false;
+
+        // Mutate the args
+        for (size_t i = 0; i < op->args.size(); i++) {
+            Expr old_arg = op->args[i];
+            Expr new_arg = mutate(old_arg);
+            if (!expr.defined()) return;
+            if (!new_arg.same_as(old_arg)) changed = true;
+            new_args[i] = new_arg;
+        }
+
+        if (!changed) {
+            expr = op;
+        } else {
+            expr = AddressOf::make(op->type, op->name, new_args, op->image,
+                                   op->param, op->func, op->value_index);
+        }
+    }
+
     void visit(const Let *op) {
         Expr value = mutate(op->value);
         if (!value.defined()) {

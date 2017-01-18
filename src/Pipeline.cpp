@@ -419,6 +419,16 @@ private:
         include_buffer(op->image);
         include_parameter(op->param);
     }
+
+    void visit(const AddressOf *op) {
+        IRGraphVisitor::visit(op);
+        if (op->func.defined()) {
+            Function fn(op->func);
+            visit_function(fn);
+        }
+        include_buffer(op->image);
+        include_parameter(op->param);
+    }
 };
 
 } // namespace Internal

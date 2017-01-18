@@ -63,6 +63,7 @@ enum class IRNodeType {
     IfThenElse,
     Evaluate,
     Shuffle,
+    AddressOf,
 };
 
 /** The abstract base classes for a node in the Halide IR. */

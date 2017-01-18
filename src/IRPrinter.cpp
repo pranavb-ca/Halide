@@ -675,4 +675,10 @@ void IRPrinter::visit(const Shuffle *op) {
     }
 }
 
+void IRPrinter::visit(const AddressOf *op) {
+    stream << op->name << "(";
+    print_list(op->args);
+    stream << ")";
+}
+
 }}

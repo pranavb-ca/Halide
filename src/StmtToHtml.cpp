@@ -572,6 +572,12 @@ private:
         stream << close_span();
     }
 
+    void visit(const AddressOf *op) {
+        stream << open_span("AddressOf");
+        print_list(symbol(op->name) + "(", op->args, ")");
+        stream << close_span();
+    }
+
 public:
     void print(Expr ir) {
         ir.accept(this);

@@ -38,12 +38,33 @@ void Closure::visit(const For *op) {
     ignore.pop(op->name);
 }
 
+void Closure::visit(const AddressOf *op) {
+    internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+
+    op->args[0].accept(this);
+    if (!ignore.contains(op->name)) {
+        debug(3) << "Adding buffer " << op->name << " to closure\n";
+        Buffer &ref = buffers[op->name];
+        ref.type = op->type.element_of(); // TODO: Validate type is the same as existing refs?
+        ref.read = true;
+
+        // If reading an image/buffer, compute the size.
+        if (op->image.defined()) {
+            ref.size = op->image.size_in_bytes();
+            ref.dimensions = op->image.dimensions();
+        }
+    } else {
+        debug(3) << "Not adding " << op->name << " to closure\n";
+    }
+}
+
 void Closure::visit(const Load *op) {
     op->predicate.accept(this);
     op->index.accept(this);
     if (!ignore.contains(op->name)) {
         debug(3) << "Adding buffer " << op->name << " to closure\n";
-        Buffer & ref = buffers[op->name];
+        Buffer &ref = buffers[op->name];
         ref.type = op->type.element_of(); // TODO: Validate type is the same as existing refs?
         ref.read = true;
 
@@ -63,7 +84,7 @@ void Closure::visit(const Store *op) {
     op->value.accept(this);
     if (!ignore.contains(op->name)) {
         debug(3) << "Adding buffer " << op->name << " to closure\n";
-        Buffer & ref = buffers[op->name];
+        Buffer &ref = buffers[op->name];
         ref.type = op->value.type().element_of(); // TODO: Validate type is the same as existing refs?
         // TODO: do we need to set ref.dimensions?
         ref.write = true;

@@ -109,7 +109,7 @@ private:
         }
 
         // Construct an array of index expressions to construct
-        // address_of calls with. The first 2 dimensions are handled
+        // AddressOf calls with. The first 2 dimensions are handled
         // by (up to) 2D prefetches, the rest we will generate loops
         // to define.
         vector<string> index_names(box.size());
@@ -120,10 +120,11 @@ private:
         }
 
         // Make a load at the index and get the address.
-        Expr prefetch_load = make_similar_load(body, buf_name, indices);
-        internal_assert(prefetch_load.defined());
-        Type type = prefetch_load.type();
-        Expr prefetch_addr = Call::make(Handle(), Call::address_of, {prefetch_load}, Call::Intrinsic);
+        const Load *prefetch_load = make_similar_load(body, buf_name, indices).as<Load>();
+        internal_assert(prefetch_load);
+        Type type = prefetch_load->type;
+        Expr prefetch_addr = AddressOf::make(Handle(), prefetch_load->name, {prefetch_load->index},
+                                             prefetch_load->image, prefetch_load->param);
 
         Stmt prefetch;
         Expr stride_0 = Variable::make(Int(32), buf_name + ".stride.0");

@@ -64,6 +64,12 @@ public:
         }
     }
 
+    void visit(const AddressOf *op) {
+        if (op->param.defined()) {
+            record(op->param);
+        }
+        IRGraphVisitor::visit(op);
+    }
 
     void visit(const Load *load) {
         if (load->param.defined()) {
@@ -181,9 +187,7 @@ class KeyInfo {
 #define USE_FULL_NAMES_IN_KEY 0
 #if USE_FULL_NAMES_IN_KEY
     Stmt call_copy_memory(const std::string &key_name, const std::string &value, Expr index) {
-        Expr dest = Call::make(Handle(), Call::address_of,
-                               {Load::make(UInt(8), key_name, index, Buffer<>(), Parameter(), const_true())},
-                               Call::PureIntrinsic);
+        Expr dest = AddressOf::make(Handle(), key_name, index, Buffer<>(), Parameter());
         Expr src = StringImm::make(value);
         Expr copy_size = (int32_t)value.size();
 
@@ -311,9 +315,7 @@ public:
     Expr generate_lookup(std::string key_allocation_name, std::string computed_bounds_name,
                          int32_t tuple_count, std::string storage_base_name) {
         std::vector<Expr> args;
-        args.push_back(Call::make(type_of<uint8_t *>(), Call::address_of,
-                                  {Load::make(type_of<uint8_t>(), key_allocation_name, Expr(0), Buffer<>(), Parameter(), const_true())},
-                                  Call::PureIntrinsic));
+        args.push_back(AddressOf::make(type_of<uint8_t *>(), key_allocation_name, {Expr(0)}, Buffer<>(), Parameter()));
         args.push_back(key_size());
         args.push_back(Variable::make(type_of<buffer_t *>(), computed_bounds_name));
         args.push_back(tuple_count);
@@ -334,9 +336,7 @@ public:
     Stmt store_computation(std::string key_allocation_name, std::string computed_bounds_name,
                            int32_t tuple_count, std::string storage_base_name) {
         std::vector<Expr> args;
-        args.push_back(Call::make(type_of<uint8_t *>(), Call::address_of,
-                                  {Load::make(type_of<uint8_t>(), key_allocation_name, Expr(0), Buffer<>(), Parameter(), const_true())},
-                                  Call::PureIntrinsic));
+        args.push_back(AddressOf::make(type_of<uint8_t *>(), key_allocation_name, {Expr(0)}, Buffer<>(), Parameter()));
         args.push_back(key_size());
         args.push_back(Variable::make(type_of<buffer_t *>(), computed_bounds_name));
         args.push_back(tuple_count);
@@ -536,22 +536,21 @@ private:
                 << "RewriteMemoizedAllocations: _halide_buffer_init call with fewer than two args.\n";
 
             // Grab the host pointer argument
-            const Call *arg1 = call->args[1].as<Call>();
-            if (arg1 != nullptr && arg1->is_intrinsic(Call::address_of)) {
-                internal_assert(arg1->args.size() > 0) << "RewriteMemoizedAllocations: address_of call with zero args.\n";
-                const Load *load = arg1->args[0].as<Load>();
-                if (load != nullptr) {
-                    const IntImm *index = load->index.as<IntImm>();
+            const AddressOf *arg1 = call->args[1].as<AddressOf>();
+            if (arg1 != nullptr) {
+                internal_assert(arg1->args.size() == 1 && !arg1->func.defined())
+                    << "RewriteMemoizedAllocations: AddressOf should be to a load.\n";
 
-                    if (index != nullptr && index->value == 0 &&
-                        get_realization_name(load->name) == innermost_realization_name) {
-                        // Everything matches, rewrite _halide_buffer_init to use a nullptr handle for address.
-                        std::vector<Expr> args = call->args;
-                        args[1] = make_zero(Handle());
-                        expr = Call::make(type_of<struct buffer_t *>(), Call::buffer_init,
-                                          args, Call::Extern);
-                        return;
-                    }
+                const IntImm *index = arg1->args[0].as<IntImm>();
+
+                if (index != nullptr && index->value == 0 &&
+                    get_realization_name(arg1->name) == innermost_realization_name) {
+                    // Everything matches, rewrite _halide_buffer_init to use a nullptr handle for address.
+                    std::vector<Expr> args = call->args;
+                    args[1] = make_zero(Handle());
+                    expr = Call::make(type_of<struct buffer_t *>(), Call::buffer_init,
+                                      args, Call::Extern);
+                    return;
                 }
             }
       }

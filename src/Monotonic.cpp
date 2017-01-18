@@ -305,6 +305,17 @@ class MonotonicVisitor : public IRVisitor {
         result = Monotonic::Constant;
     }
 
+    void visit(const AddressOf *op) {
+        for (size_t i = 0; i < op->args.size(); i++) {
+            op->args[i].accept(this);
+            if (result != Monotonic::Constant) {
+                result = Monotonic::Unknown;
+                return;
+            }
+        }
+        result = Monotonic::Constant;
+    }
+
     void visit(const Let *op) {
         op->value.accept(this);
 

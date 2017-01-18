@@ -54,49 +54,28 @@ public:
 private:
     using IRMutator::visit;
 
-    void visit(const Call *op) {
-
-        // Calls inside of an address_of don't count, but we want to
+    void visit(const AddressOf *op) {
+        // Calls inside of an AddressOf don't count, but we want to
         // visit the args of the inner call.
-        if (op->is_intrinsic(Call::address_of)) {
-            internal_assert(op->args.size() == 1);
-            const Call *c = op->args[0].as<Call>();
-            const Load *l = op->args[0].as<Load>();
 
-            internal_assert(c || l);
-
-            std::vector<Expr> args;
-            if (c) {
-                args = c->args;
-            } else {
-                args.push_back(l->index);
-            }
-
-            bool unchanged = true;
-            vector<Expr> new_args(args.size());
-            for (size_t i = 0; i < args.size(); i++) {
-                new_args[i] = mutate(args[i]);
-                unchanged = unchanged && (new_args[i].same_as(args[i]));
-            }
-
-            if (unchanged) {
-                expr = op;
-                return;
-            } else {
-                Expr inner;
-                if (c) {
-                    inner = Call::make(c->type, c->name, new_args, c->call_type,
-                                       c->func, c->value_index, c->image, c->param);
-                } else {
-                    Expr inner = Load::make(l->type, l->name, new_args[0], l->image, l->param, l->predicate);
-                }
-                expr = Call::make(op->type, Call::address_of, {inner}, Call::Intrinsic);
-                return;
-            }
+        bool unchanged = true;
+        vector<Expr> new_args(op->args.size());
+        for (size_t i = 0; i < op->args.size(); i++) {
+            new_args[i] = mutate(op->args[i]);
+            unchanged = unchanged && (new_args[i].same_as(op->args[i]));
         }
 
+        if (unchanged) {
+            expr = op;
+            return;
+        } else {
+            expr = AddressOf::make(op->type, op->name, new_args, op->image,
+                                   op->param, op->func, op->value_index);
+            return;
+        }
+    }
 
-
+    void visit(const Call *op) {
         IRMutator::visit(op);
         op = expr.as<Call>();
         internal_assert(op);
@@ -132,7 +111,6 @@ private:
                              Call::make(op->type, Call::return_second,
                                         {trace, value_var}, Call::PureIntrinsic));
         }
-
     }
 
     void visit(const Provide *op) {
