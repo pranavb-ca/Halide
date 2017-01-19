@@ -46,7 +46,7 @@ public:
         }
 
         if (call->is_intrinsic(Call::memoize_expr)) {
-            internal_assert(call->args.size() > 0);
+            internal_assert(!call->args.empty());
             if (call->args.size() == 1) {
                 record(call->args[0]);
             } else {

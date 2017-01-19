@@ -58,9 +58,6 @@ bool should_extract(Expr e) {
         return !is_const(a->stride);
     }
 
-    if (e.as<AddressOf>()) {
-        return false;
-    }
     return true;
 }
 
