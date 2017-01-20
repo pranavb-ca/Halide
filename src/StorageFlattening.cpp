@@ -207,8 +207,7 @@ private:
         if (op->func.defined()) {
             internal_assert(op->value_index == 0);
             Expr idx = mutate(flatten_args(op->name, op->args));
-            expr = Load::make(op->type, op->name, idx, op->image, op->param,
-                              const_true(op->type.lanes()));
+            expr = AddressOf::make(op->type, op->name, {idx}, op->image, op->param);
         } else {
             IRMutator::visit(op);
         }
