@@ -134,6 +134,11 @@ class Inliner : public IRMutator {
         found = old_found;
     }
 
+    void visit(const AddressOf *op) {
+        internal_assert(op->name != func.name())
+            << "It is invalid to take address of an inlined function\n";
+    }
+
 public:
     bool found;
 

@@ -52,8 +52,31 @@ class SplitTuples : public IRMutator {
         realizations.pop(op->name);
     }
 
+    void visit(const AddressOf *op) {
+        if (op->func.defined()) {
+            auto it = env.find(op->name);
+            internal_assert(it != env.end());
+            Function f = it->second;
+            string name = op->name;
+            if (f.outputs() > 1) {
+                name += "." + std::to_string(op->value_index);
+            }
+            vector<Expr> args;
+            for (Expr e : op->args) {
+                args.push_back(mutate(e));
+            }
+            // It's safe to hook up the pointer to the function
+            // unconditionally. This expr never gets held by a
+            // Function, so there can't be a cycle. We do this even
+            // for scalar provides.
+            expr = AddressOf::make(op->type, name, args, Buffer<>(), Parameter(), f.get_contents());
+        } else {
+            IRMutator::visit(op);
+        }
+    }
+
     void visit(const Call *op) {
-        if (op->call_type == Call::Halide) {            
+        if (op->call_type == Call::Halide) {
             auto it = env.find(op->name);
             internal_assert(it != env.end());
             Function f = it->second;
@@ -85,7 +108,7 @@ class SplitTuples : public IRMutator {
         // this we mean can we compute and store the values one at a
         // time (not atomic), or must we compute them all, and then
         // store them all (atomic).
-        bool atomic = false;        
+        bool atomic = false;
         if (!realizations.contains(op->name) &&
             uses_extern_image(op)) {
             // If the provide is an output (it's not inside a
@@ -128,7 +151,7 @@ class SplitTuples : public IRMutator {
             provides.push_back(Provide::make(name, {val}, args));
         }
 
-        Stmt result = Block::make(provides);        
+        Stmt result = Block::make(provides);
 
         while (!lets.empty()) {
             auto p = lets.back();
@@ -138,10 +161,10 @@ class SplitTuples : public IRMutator {
 
         stmt = result;
     }
-    
+
     const map<string, Function> &env;
     Scope<int> realizations;
-    
+
 public:
 
     SplitTuples(const map<string, Function> &e) : env(e) {}
