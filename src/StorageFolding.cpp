@@ -58,6 +58,19 @@ class FoldStorageOfFunction : public IRMutator {
 
     using IRMutator::visit;
 
+    void visit(const AddressOf *op) {
+        IRMutator::visit(op);
+        op = expr.as<AddressOf>();
+        internal_assert(op);
+        if (op->func.defined() && op->name == func) {
+            vector<Expr> args = op->args;
+            internal_assert(dim < (int)args.size());
+            args[dim] = is_one(factor) ? 0 : (args[dim] % factor);
+            expr = AddressOf::make(op->type, op->name, args, op->image, op->param,
+                                   op->func, op->value_index);
+        }
+    }
+
     void visit(const Call *op) {
         IRMutator::visit(op);
         op = expr.as<Call>();

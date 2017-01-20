@@ -120,10 +120,10 @@ private:
         }
 
         // Make a load at the index and get the address.
-        const Load *prefetch_load = make_similar_load(body, buf_name, indices).as<Load>();
+        const Call *prefetch_load = make_similar_load(body, buf_name, indices).as<Call>();
         internal_assert(prefetch_load);
         Type type = prefetch_load->type;
-        Expr prefetch_addr = AddressOf::make(Handle(), prefetch_load->name, {prefetch_load->index},
+        Expr prefetch_addr = AddressOf::make(Handle(), prefetch_load->name, prefetch_load->args,
                                              prefetch_load->image, prefetch_load->param);
 
         Stmt prefetch;

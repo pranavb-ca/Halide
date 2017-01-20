@@ -20,6 +20,10 @@ namespace Internal {
  * a closure if you want to migrate the body of the statement to its
  * own function (e.g. because it's the body of a parallel for loop. */
 class Closure : public IRVisitor {
+private:
+    template<typename AddressOfOrLoad>
+    void mark_load_buffer(const AddressOfOrLoad *op);
+
 protected:
     Scope<int> ignore;
 

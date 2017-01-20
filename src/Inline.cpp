@@ -136,7 +136,7 @@ class Inliner : public IRMutator {
 
     void visit(const AddressOf *op) {
         internal_assert(op->name != func.name())
-            << "It is invalid to take address of an inlined function\n";
+            << "Address of an inlined function is undefined\n";
     }
 
 public:

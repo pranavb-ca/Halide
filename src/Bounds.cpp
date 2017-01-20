@@ -676,6 +676,10 @@ private:
         }
     }
 
+    void visit(const AddressOf *op) {
+        interval = Interval::everything();
+    }
+
     void visit(const Let *op) {
         op->value.accept(this);
         Interval val = interval;

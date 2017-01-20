@@ -422,7 +422,6 @@ class InjectBufferCopies : public IRMutator {
     void visit(const AddressOf *op) {
         // We're after storage flattening, so only address of a load should remain.
         internal_assert(op->args.size() == 1 && !op->func.defined());
-
         IRMutator::visit(op);
     }
 

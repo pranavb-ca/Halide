@@ -28,6 +28,18 @@ class ReplaceParams : public IRMutator {
 
     using IRMutator::visit;
 
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+        auto i = replacements.find(op->name);
+        if (i != replacements.end()) {
+            expr = AddressOf::make(op->type, op->name, {mutate(op->args[0])},
+                                   op->image, i->second);
+        } else {
+            IRMutator::visit(op);
+        }
+    }
+
     void visit(const Load *op) {
         auto i = replacements.find(op->name);
         if (i != replacements.end()) {

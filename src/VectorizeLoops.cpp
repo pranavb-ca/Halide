@@ -461,6 +461,19 @@ class VectorSubs : public IRMutator {
         }
     }
 
+    void visit(const AddressOf *op) {
+        internal_assert(op->args.size() == 1 && !op->func.defined())
+            << "Only AddressOf a load should remain after storage flattening\n";
+
+        Expr index = mutate(op->args[0]);
+        if (index.same_as(op->args[0])) {
+            expr = op;
+        } else {
+            int w = index.type().lanes();
+            expr = AddressOf::make(op->type.with_lanes(w), op->name, {index}, op->image, op->param);
+        }
+    }
+
     void visit(const Load *op) {
         Expr predicate = mutate(op->predicate);
         Expr index = mutate(op->index);

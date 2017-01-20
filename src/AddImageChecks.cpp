@@ -27,7 +27,8 @@ public:
 
     using IRGraphVisitor::visit;
 
-    void visit(const Call *op) {
+    template<typename AddressOfOrCall>
+    void visit_address_of_or_call(const AddressOfOrCall *op) {
         IRGraphVisitor::visit(op);
         if (op->image.defined()) {
             Result r;
@@ -44,11 +45,20 @@ public:
         }
     }
 
+    void visit(const AddressOf *op) {
+        visit_address_of_or_call(op);
+    }
+
+    void visit(const Call *op) {
+        visit_address_of_or_call(op);
+    }
+
     void visit(const Variable *op) {
         if (ends_with(op->name, ".buffer") &&
             op->param.defined() &&
             op->param.is_buffer() &&
             buffers.find(op->param.name()) == buffers.end()) {
+
             Result r;
             r.param = op->param;
             r.type = op->param.type();
