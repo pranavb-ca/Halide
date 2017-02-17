@@ -142,6 +142,9 @@ struct Label {
 
 // A struct specifying how a single Func will get visualized.
 struct FuncInfo {
+
+    bool configured = false;
+
     // Configuration for how the func should be drawn
     struct Config {
         int zoom = 0;
@@ -267,10 +270,10 @@ struct FuncInfo {
 // Composite a single pixel of b over a single pixel of a, writing the result into dst
 void composite(uint8_t *a, uint8_t *b, uint8_t *dst) {
     uint8_t alpha = b[3];
-    dst[0] = (alpha * b[0] + (256 - alpha) * a[0]) >> 8;
-    dst[1] = (alpha * b[1] + (256 - alpha) * a[1]) >> 8;
-    dst[2] = (alpha * b[2] + (256 - alpha) * a[2]) >> 8;
-    dst[3] = 0xff;
+    dst[0] = (alpha * b[0] + (255 - alpha) * a[0]) / 255;
+    dst[1] = (alpha * b[1] + (255 - alpha) * a[1]) / 255;
+    dst[2] = (alpha * b[2] + (255 - alpha) * a[2]) / 255;
+    dst[3] = 255 - (((255 - a[3]) * (255 - b[3])) / 255);
 }
 
 #define FONT_W 12
@@ -332,6 +335,7 @@ void usage() {
             "    Defaults to 250.\n"
             " -l func label x y n: When func is first touched, the label appears at\n"
             "    the given coordinates and fades in over n frames.\n"
+            " -u r g b: The color to use for uninitialized memory. Defaults to black.\n"
             "\n"
             " For each Func you want to visualize, also specify:\n"
             " -f func_name min_value max_value color_dim blank zoom cost x y strides\n"
@@ -372,7 +376,38 @@ void usage() {
 
 }
 
+// See all boxes corresponding to positions in a Func's allocation to
+// the given color. Recursive to handle arbitrary
+// dimensionalities. Used by begin and end realization events.
+void fill_realization(uint32_t *image, int image_width, uint32_t color, const FuncInfo &fi,
+                      Packet &p, int current_dimension = 0, int x_off = 0, int y_off = 0) {
+    assert(p.dimensions >= 2 * fi.config.dims);
+    if (2 * current_dimension == p.dimensions) {
+        int x_min = x_off * fi.config.zoom + fi.config.x;
+        int y_min = y_off * fi.config.zoom + fi.config.y;
+        for (int y = 0; y < fi.config.zoom; y++) {
+            for (int x = 0; x < fi.config.zoom; x++) {
+                int idx = (y_min + y) * image_width + (x_min + x);
+                image[idx] = color;
+            }
+        }
+    } else {
+        int min = p.get_coord(current_dimension * 2 + 0);
+        int extent = p.get_coord(current_dimension * 2 + 1);
+        for (int i = min; i < min + extent; i++) {
+            fill_realization(image, image_width, color, fi, p, current_dimension + 1, x_off, y_off);
+            x_off += fi.config.x_stride[current_dimension];
+            y_off += fi.config.y_stride[current_dimension];
+        }
+    }
+}
+
 int run(int argc, char **argv) {
+    if (argc == 1) {
+        usage();
+        return 0;
+    }
+
     // State that determines how different funcs get drawn
     int frame_width = 1920, frame_height = 1080;
     int decay_factor = 2;
@@ -380,6 +415,8 @@ int run(int argc, char **argv) {
 
     int timestep = 10000;
     int hold_frames = 250;
+
+    uint32_t uninitialized_memory_color = 255 << 24;
 
     // Parse command line args
     int i = 1;
@@ -399,6 +436,7 @@ int run(int argc, char **argv) {
             }
             char *func = argv[++i];
             FuncInfo &fi = func_info[func];
+            fi.configured = true;
             fi.config.min = atof(argv[++i]);
             fi.config.max = atof(argv[++i]);
             fi.config.color_dim = atoi(argv[++i]);
@@ -450,6 +488,15 @@ int run(int argc, char **argv) {
             }
             assert(i + 1 < argc);
             hold_frames = atoi(argv[++i]);
+        } else if (next == "-u") {
+            if (i + 3 >= argc) {
+                usage();
+                return -1;
+            }
+            int r = atoi(argv[++i]);
+            int g = atoi(argv[++i]);
+            int b = atoi(argv[++i]);
+            uninitialized_memory_color = (255 << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255);
         } else {
             usage();
             return -1;
@@ -469,6 +516,9 @@ int run(int argc, char **argv) {
 
     uint32_t *anim = new uint32_t[frame_width * frame_height];
     memset(anim, 0, 4 * frame_width * frame_height);
+
+    uint32_t *anim_decay = new uint32_t[frame_width * frame_height];
+    memset(anim_decay, 0, 4 * frame_width * frame_height);
 
     uint32_t *text = new uint32_t[frame_width * frame_height];
     memset(text, 0, 4 * frame_width * frame_height);
@@ -494,35 +544,45 @@ int run(int argc, char **argv) {
             }
         }
 
-        while (halide_clock >= video_clock) {
-            // Composite text over anim over image
-            for (int i = 0; i < frame_width * frame_height; i++) {
-                uint8_t *anim_px  = (uint8_t *)(anim + i);
-                uint8_t *image_px = (uint8_t *)(image + i);
-                uint8_t *text_px  = (uint8_t *)(text + i);
-                uint8_t *blend_px = (uint8_t *)(blend + i);
-                composite(image_px, anim_px, blend_px);
-                composite(blend_px, text_px, blend_px);
+        if (halide_clock >= video_clock) {
+            while (halide_clock >= video_clock) {
+                // Composite text over anim over image
+                for (int i = 0; i < frame_width * frame_height; i++) {
+                    uint8_t *anim_decay_px  = (uint8_t *)(anim_decay + i);
+                    uint8_t *anim_px  = (uint8_t *)(anim + i);
+                    uint8_t *image_px = (uint8_t *)(image + i);
+                    uint8_t *text_px  = (uint8_t *)(text + i);
+                    uint8_t *blend_px = (uint8_t *)(blend + i);
+                    // anim over anim_decay
+                    composite(anim_decay_px, anim_px, anim_decay_px);
+                    // anim_decay over image
+                    composite(image_px, anim_decay_px, blend_px);
+                    // text over image
+                    composite(blend_px, text_px, blend_px);
+                }
+
+                // Dump the frame
+                ssize_t bytes = 4 * frame_width * frame_height;
+                ssize_t bytes_written = write(1, blend, bytes);
+                if (bytes_written < bytes) {
+                    fprintf(stderr, "Could not write frame to stdout.\n");
+                    return -1;
+                }
+
+                video_clock += timestep;
+
+                // Decay the anim_decay
+                for (int i = 0; i < frame_width * frame_height; i++) {
+                    uint32_t color = anim_decay[i];
+                    uint32_t rgb = color & 0x00ffffff;
+                    uint8_t alpha = (color >> 24);
+                    alpha /= decay_factor;
+                    anim_decay[i] = (alpha << 24) | rgb;
+                }
             }
 
-            // Dump the frame
-            ssize_t bytes = 4 * frame_width * frame_height;
-            ssize_t bytes_written = write(1, blend, bytes);
-            if (bytes_written < bytes) {
-                fprintf(stderr, "Could not write frame to stdout.\n");
-                return -1;
-            }
-
-            video_clock += timestep;
-
-            // Decay the alpha channel on the anim
-            for (int i = 0; i < frame_width * frame_height; i++) {
-                uint32_t color = anim[i];
-                uint32_t rgb = color & 0x00ffffff;
-                uint8_t alpha = (color >> 24);
-                alpha /= decay_factor;
-                anim[i] = (alpha << 24) | rgb;
-            }
+            // Blank anim
+            memset(anim, 0, 4 * frame_width * frame_height);
         }
 
         // Read a tracing packet
@@ -557,6 +617,7 @@ int run(int argc, char **argv) {
 
         // Draw the event
         FuncInfo &fi = func_info[qualified_name];
+        if (!fi.configured) continue;
 
         if (fi.stats.first_draw_time == 0) {
             fi.stats.first_draw_time = halide_clock;
@@ -567,23 +628,23 @@ int run(int argc, char **argv) {
             fi.stats.qualified_name = qualified_name;
         }
 
+        int frames_since_first_draw = (halide_clock - fi.stats.first_draw_time) / timestep;
+
+        for (size_t i = 0; i < fi.config.labels.size(); i++) {
+            const Label &label = fi.config.labels[i];
+            if (frames_since_first_draw <= label.n) {
+                uint32_t color = ((1 + frames_since_first_draw) * 255) / label.n;
+                if (color > 255) color = 255;
+                color *= 0x10101;
+
+                draw_text(label.text, label.x, label.y, color, text, frame_width, frame_height);
+            }
+        }
+
         switch (p.event) {
         case halide_trace_load:
         case halide_trace_store:
         {
-            int frames_since_first_draw = (halide_clock - fi.stats.first_draw_time) / timestep;
-
-            for (size_t i = 0; i < fi.config.labels.size(); i++) {
-                const Label &label = fi.config.labels[i];
-                if (frames_since_first_draw <= label.n) {
-                    uint32_t color = ((1 + frames_since_first_draw) * 255) / label.n;
-                    if (color > 255) color = 255;
-                    color *= 0x10101;
-
-                    draw_text(label.text, label.x, label.y, color, text, frame_width, frame_height);
-                }
-            }
-
             if (p.event == halide_trace_store) {
                 // Stores take time proportional to the number of
                 // items stored times the cost of the func.
@@ -667,27 +728,11 @@ int run(int argc, char **argv) {
         case halide_trace_begin_realization:
             fi.stats.num_realizations++;
             pipeline_info[p.id] = pipeline;
+            fill_realization(image, frame_width, uninitialized_memory_color, fi, p);
             break;
         case halide_trace_end_realization:
             if (fi.config.blank_on_end_realization) {
-                assert(p.dimensions >= 2 * fi.config.dims);
-                int x_min = fi.config.x, y_min = fi.config.y;
-                int x_extent = 0, y_extent = 0;
-                for (int d = 0; d < fi.config.dims; d++) {
-                    int m = p.get_coord(d * 2 + 0);
-                    int e = p.get_coord(d * 2 + 1);
-                    x_min += fi.config.zoom * fi.config.x_stride[d] * m;
-                    y_min += fi.config.zoom * fi.config.y_stride[d] * m;
-                    x_extent += fi.config.zoom * fi.config.x_stride[d] * e;
-                    y_extent += fi.config.zoom * fi.config.y_stride[d] * e;
-                }
-                if (x_extent == 0) x_extent = fi.config.zoom;
-                if (y_extent == 0) y_extent = fi.config.zoom;
-                for (int y = y_min; y < y_min + y_extent; y++) {
-                    for (int x = x_min; x < x_min + x_extent; x++) {
-                        image[y * frame_width + x] = 0;
-                    }
-                }
+                fill_realization(image, frame_width, 0, fi, p);
             }
             pipeline_info.erase(p.parent_id);
             break;
