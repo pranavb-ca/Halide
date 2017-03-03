@@ -192,7 +192,7 @@ struct StorageDim {
     bool fold_forward;
 };
 
-struct Prefetch {
+struct PrefetchDirective {
     std::string var;
     Expr offset;
 };
@@ -282,8 +282,8 @@ public:
     /** You may perform prefetching in some of the dimensions of a
      * function. See \ref Func::prefetch */
     // @{
-    const std::vector<Prefetch> &prefetches() const;
-    std::vector<Prefetch> &prefetches();
+    const std::vector<PrefetchDirective> &prefetches() const;
+    std::vector<PrefetchDirective> &prefetches();
     // @}
 
     /** Mark calls of a function by 'f' to be replaced with its wrapper

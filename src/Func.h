@@ -41,6 +41,8 @@ struct VarOrRVar {
     bool is_rvar;
 };
 
+class ImageParam;
+
 namespace Internal {
 struct Split;
 struct StorageDim;
@@ -169,7 +171,6 @@ public:
     /** Scheduling calls that control how the domain of this stage is
      * traversed. See the documentation for Func for the meanings. */
     // @{
-
     EXPORT Stage &split(VarOrRVar old, VarOrRVar outer, VarOrRVar inner, Expr factor, TailStrategy tail = TailStrategy::Auto);
     EXPORT Stage &fuse(VarOrRVar inner, VarOrRVar outer, VarOrRVar fused);
     EXPORT Stage &serial(VarOrRVar var);
@@ -279,7 +280,8 @@ public:
     EXPORT Stage &allow_race_conditions();
 
     EXPORT Stage &hexagon(VarOrRVar x = Var::outermost());
-    EXPORT Stage &prefetch(VarOrRVar var, Expr offset = 1);
+    EXPORT Stage &prefetch(const Func &f, VarOrRVar var, Expr offset = 1);
+    EXPORT Stage &prefetch(const ImageParam &image, VarOrRVar var, Expr offset = 1);
     // @}
 };
 
@@ -1524,11 +1526,14 @@ public:
      * Hexagon, that loop is executed on a Hexagon DSP. */
     EXPORT Func &hexagon(VarOrRVar x = Var::outermost());
 
-    /** Prefetch data read by a subsequent loop iteration, at an
-     * optionally specified iteration offset. This is currently only
-     * implemented on Hexagon, prefetch directives are ignored on
-     * other targets. */
-    EXPORT Func &prefetch(VarOrRVar var, Expr offset = 1);
+    /** Prefetch data read from a Func or an ImageParam by a subsequent loop
+     * iteration, at an optionally specified iteration offset. This is
+     * currently only implemented on Hexagon, prefetch directives are
+     * ignored on other targets. */
+    // @{
+    EXPORT Func &prefetch(const Func &f, VarOrRVar var, Expr offset = 1);
+    EXPORT Func &prefetch(const ImageParam &image, VarOrRVar var, Expr offset = 1);
+    // @}
 
     /** Specify how the storage for the function is laid out. These
      * calls let you specify the nesting order of the dimensions. For

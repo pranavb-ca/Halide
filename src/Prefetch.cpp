@@ -69,7 +69,7 @@ public:
 
 private:
     const map<string, Function> &env;
-    const vector<Prefetch> *prefetches = nullptr;
+    const vector<PrefetchDirective> *prefetches = nullptr;
     Scope<Interval> bounds;
 
 private:
@@ -90,7 +90,7 @@ private:
     }
 
     void visit(const ProducerConsumer *op) {
-        const vector<Prefetch> *old_prefetches = prefetches;
+        const vector<PrefetchDirective> *old_prefetches = prefetches;
 
         map<string, Function>::const_iterator iter = env.find(op->name);
         internal_assert(iter != env.end()) << "function not in environment.\n";
@@ -172,7 +172,7 @@ private:
         bounds.pop(op->name);
 
         if (prefetches) {
-            for (const Prefetch &p : *prefetches) {
+            for (const PrefetchDirective &p : *prefetches) {
                 if (!ends_with(op->name, "." + p.var)) {
                     continue;
                 }

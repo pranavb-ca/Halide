@@ -1709,10 +1709,15 @@ Stage &Stage::hexagon(VarOrRVar x) {
     return *this;
 }
 
-Stage &Stage::prefetch(VarOrRVar var, Expr offset) {
-    Prefetch prefetch = {var.name(), offset};
+Stage &Stage::prefetch(const Func &f, VarOrRVar var, Expr offset) {
+    PrefetchDirective prefetch = {var.name(), offset};
     definition.schedule().prefetches().push_back(prefetch);
+    return *this;
+}
 
+Stage &Stage::prefetch(const ImageParam &image, VarOrRVar var, Expr offset) {
+    PrefetchDirective prefetch = {var.name(), offset};
+    definition.schedule().prefetches().push_back(prefetch);
     return *this;
 }
 
@@ -2182,9 +2187,15 @@ Func &Func::hexagon(VarOrRVar x) {
     return *this;
 }
 
-Func &Func::prefetch(VarOrRVar var, Expr offset) {
+Func &Func::prefetch(const Func &f, VarOrRVar var, Expr offset) {
     invalidate_cache();
-    Stage(func.definition(), name(), args(), func.schedule().storage_dims()).prefetch(var, offset);
+    Stage(func.definition(), name(), args(), func.schedule().storage_dims()).prefetch(f, var, offset);
+    return *this;
+}
+
+Func &Func::prefetch(const ImageParam &image, VarOrRVar var, Expr offset) {
+    invalidate_cache();
+    Stage(func.definition(), name(), args(), func.schedule().storage_dims()).prefetch(image, var, offset);
     return *this;
 }
 
