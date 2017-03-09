@@ -72,23 +72,41 @@ class ReducePrefetchDimension : public IRMutator {
         const Call *call = op->value.as<Call>();
 
         // Reduce the prefetch dimension if bigger than 2
-        if (call && call->is_intrinsic(Call::prefetch) && (call->args.size() > 7)) {
-            vector<Expr> args;
-            for (size_t i = 0; i < call->args.size(); ++i) {
+        if (call && call->is_intrinsic(Call::prefetch) && (call->args.size() > 5)) {
+            const Call *base_addr = call->args[0].as<Call>();
+            internal_assert(base_addr && base_addr->is_intrinsic(Call::address_of));
+            const Load *base = base_addr->args[0].as<Load>();
+            internal_assert(base);
+
+            vector<string> index_names;
+            Expr offset = 0;
+            for (size_t i = 5; i < call->args.size(); i += 2) {
+                Expr stride = call->args[i+1];
+                string index_name = "prefetch_" + call->name + "." + std::to_string((i-1)/2);
+                index_names.push_back(index_name);
+                offset += Variable::make(Int(32), index_name) * stride;
+            }
+            vector<Expr> args = {Load::make(base->type, base->name, simplify(base->index + offset),
+                                            base->image, base->param, base->predicate)};
+            for (size_t i = 1; i < call->args.size(); ++i) {
                 args.push_back(call->args[i]);
             }
-
             stmt = Evaluate::make(Call::make(call->type, Call::prefetch, args, Call::Intrinsic));
 
             // TODO(psuriana)
-            /*for (size_t i = 7; i < call->args.size(); i += 3) {
-                stmt = For::make(index_names[i], call->args[i], call->args[i+1],
+            for (size_t i = 5; i < call->args.size(); i += 2) {
+                stmt = For::make(index_names[(i-1)/2], 0, call->args[i],
                                  ForType::Serial, DeviceAPI::None, stmt);
-            }*/
+            }
         }
     }
 };
 
+Stmt reduce_prefetch_dimension(Stmt stmt) {
+    ReducePrefetchDimension reducer;
+    stmt = reducer.mutate(stmt);
+    return stmt;
+}
 
 // Broadcast to an unknown number of lanes, for making patterns.
 Expr bc(Expr x) { return Broadcast::make(x, 0); }
@@ -1680,6 +1698,9 @@ Stmt optimize_hexagon_shuffles(Stmt s, int lut_alignment) {
 }
 
 Stmt optimize_hexagon_instructions(Stmt s) {
+    // For multi-dimensional prefetches, reduce it to 1D/2D prefetches.
+    s = reduce_prefetch_dimension(s);
+
     // Peephole optimize for Hexagon instructions. These can generate
     // interleaves and deinterleaves alongside the HVX intrinsics.
     s = OptimizePatterns().mutate(s);

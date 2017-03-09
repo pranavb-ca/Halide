@@ -1496,21 +1496,22 @@ void CodeGen_Hexagon::visit(const Call *op) {
     }
 
     if (op->is_intrinsic(Call::prefetch)) {
-        internal_assert((op->args.size() == 4) || (op->args.size() == 7))
+        debug(0) << "GET HERE\n";
+        internal_assert((op->args.size() == 3) || (op->args.size() == 5))
             << "Hexagon only supports 1D or 2D prefetch\n";
 
         vector<llvm::Value *> args;
-        args.push_back(codegen(op->args[1]));
-        Expr extent_0_bytes = op->args[2] * op->args[3] * op->type.bytes();
+        args.push_back(codegen(op->args[0]));
+        Expr extent_0_bytes = op->args[1] * op->args[2] * op->type.bytes();
         args.push_back(codegen(extent_0_bytes));
 
         llvm::Function *prefetch_fn = nullptr;
-        if (op->args.size() == 4) { // 1D prefetch: {base address, min0, extent0, stride0}
+        if (op->args.size() == 3) { // 1D prefetch: {base address, extent0, stride0}
             prefetch_fn = module->getFunction("halide_prefetch");
-        } else { // 2D prefetch: {base address, min0, extent0, stride0, min1, extent1, stride1}
+        } else { // 2D prefetch: {base address, extent0, stride0, extent1, stride1}
             prefetch_fn = module->getFunction("halide_prefetch_2d");
-            args.push_back(codegen(op->args[5]));
-            Expr stride_1_bytes = op->args[6] * op->type.bytes();
+            args.push_back(codegen(op->args[3]));
+            Expr stride_1_bytes = op->args[4] * op->type.bytes();
             args.push_back(codegen(stride_1_bytes));
         }
         internal_assert(prefetch_fn);
