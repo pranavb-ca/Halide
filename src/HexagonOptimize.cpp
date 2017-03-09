@@ -60,6 +60,36 @@ bool is_native_deinterleave(Expr x) {
 
 namespace {
 
+// This will reduce a multi-dimensional prefetch into a 2D prefetch. It keeps
+// the two innermost dimensions and adds loops for the rest of the dimensions.
+class ReducePrefetchDimension : public IRMutator {
+    using IRMutator::visit;
+
+    void visit(const Evaluate *op) {
+        IRMutator::visit(op);
+        op = stmt.as<Evaluate>();
+        internal_assert(op);
+        const Call *call = op->value.as<Call>();
+
+        // Reduce the prefetch dimension if bigger than 2
+        if (call && call->is_intrinsic(Call::prefetch) && (call->args.size() > 7)) {
+            vector<Expr> args;
+            for (size_t i = 0; i < call->args.size(); ++i) {
+                args.push_back(call->args[i]);
+            }
+
+            stmt = Evaluate::make(Call::make(call->type, Call::prefetch, args, Call::Intrinsic));
+
+            // TODO(psuriana)
+            /*for (size_t i = 7; i < call->args.size(); i += 3) {
+                stmt = For::make(index_names[i], call->args[i], call->args[i+1],
+                                 ForType::Serial, DeviceAPI::None, stmt);
+            }*/
+        }
+    }
+};
+
+
 // Broadcast to an unknown number of lanes, for making patterns.
 Expr bc(Expr x) { return Broadcast::make(x, 0); }
 

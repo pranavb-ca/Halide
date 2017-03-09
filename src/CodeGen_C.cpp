@@ -1448,6 +1448,10 @@ void CodeGen_C::visit(const Realize *op) {
     internal_error << "Cannot emit realize statements to C\n";
 }
 
+void CodeGen_C::visit(const Prefetch *op) {
+    // TODO(psuriana): add the runtime
+}
+
 void CodeGen_C::visit(const IfThenElse *op) {
     string cond_id = print_expr(op->condition);
 

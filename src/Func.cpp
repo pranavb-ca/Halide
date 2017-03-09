@@ -30,6 +30,7 @@
 #include "Solve.h"
 #include "Associativity.h"
 #include "ApplySplit.h"
+#include "ImageParam.h"
 
 namespace Halide {
 
@@ -1710,13 +1711,13 @@ Stage &Stage::hexagon(VarOrRVar x) {
 }
 
 Stage &Stage::prefetch(const Func &f, VarOrRVar var, Expr offset) {
-    PrefetchDirective prefetch = {var.name(), offset};
+    PrefetchDirective prefetch = {f.name(), var.name(), offset, Parameter()};
     definition.schedule().prefetches().push_back(prefetch);
     return *this;
 }
 
 Stage &Stage::prefetch(const ImageParam &image, VarOrRVar var, Expr offset) {
-    PrefetchDirective prefetch = {var.name(), offset};
+    PrefetchDirective prefetch = {image.name(), var.name(), offset, image.parameter()};
     definition.schedule().prefetches().push_back(prefetch);
     return *this;
 }

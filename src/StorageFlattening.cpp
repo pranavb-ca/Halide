@@ -91,7 +91,7 @@ private:
         Stmt body = mutate(op->body);
 
         // Compute the size
-        std::vector<Expr> extents;
+        vector<Expr> extents;
         for (size_t i = 0; i < op->bounds.size(); i++) {
             extents.push_back(op->bounds[i].extent);
             extents[i] = mutate(extents[i]);
@@ -200,6 +200,31 @@ private:
         } else {
             IRMutator::visit(op);
         }
+    }
+
+    void visit(const Prefetch *op) {
+        internal_assert(op->types.size() == 1)
+            << "Prefetch from multi-dimensional halide tuple should have been split\n";
+
+        vector<Expr> prefetch_min(op->bounds.size());
+        vector<Expr> prefetch_extent(op->bounds.size());
+        vector<Expr> prefetch_stride(op->bounds.size());
+        for (size_t i = 0; i < op->bounds.size(); i++) {
+            prefetch_min[i] = mutate(op->bounds[i].min);
+            prefetch_extent[i] = mutate(op->bounds[i].extent);
+            prefetch_stride[i] = Variable::make(Int(32), op->name + ".stride." + std::to_string(i));
+        }
+
+        Expr base_index = mutate(flatten_args(op->name, prefetch_min));
+        Expr base_load = Load::make(op->types[0], op->name, base_index, Buffer<>(),
+                                    op->param, const_true(op->types[0].lanes()));
+        Expr base_address = Call::make(Handle(), Call::address_of, {base_load}, Call::Intrinsic);
+        vector<Expr> args = {base_address};
+        for (size_t i = 0; i < op->bounds.size(); i++) {
+            args.push_back(prefetch_extent[i]);
+            args.push_back(prefetch_stride[i]);
+        }
+        stmt = Evaluate::make(Call::make(op->types[0], Call::prefetch, args, Call::Intrinsic));
     }
 
     void visit(const LetStmt *let) {

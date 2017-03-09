@@ -193,8 +193,11 @@ struct StorageDim {
 };
 
 struct PrefetchDirective {
+    std::string name;
     std::string var;
     Expr offset;
+    // If it's a prefetch load from an image parameter, this points to that.
+    Parameter param;
 };
 
 struct FunctionContents;
