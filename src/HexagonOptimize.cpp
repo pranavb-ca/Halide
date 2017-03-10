@@ -86,16 +86,18 @@ class ReducePrefetchDimension : public IRMutator {
                 index_names.push_back(index_name);
                 offset += Variable::make(Int(32), index_name) * stride;
             }
-            vector<Expr> args = {Load::make(base->type, base->name, simplify(base->index + offset),
-                                            base->image, base->param, base->predicate)};
-            for (size_t i = 1; i < call->args.size(); ++i) {
+            Expr new_base = Load::make(base->type, base->name, simplify(base->index + offset),
+                                       base->image, base->param, base->predicate);
+            Expr new_base_addr = Call::make(Handle(), Call::address_of, {new_base}, Call::Intrinsic);
+
+            vector<Expr> args = {new_base_addr};
+            for (int i = 1; i < 5; ++i) {
                 args.push_back(call->args[i]);
             }
-            stmt = Evaluate::make(Call::make(call->type, Call::prefetch, args, Call::Intrinsic));
 
-            // TODO(psuriana)
-            for (size_t i = 5; i < call->args.size(); i += 2) {
-                stmt = For::make(index_names[(i-1)/2], 0, call->args[i],
+            stmt = Evaluate::make(Call::make(call->type, Call::prefetch, args, Call::Intrinsic));
+            for (size_t i = 0; i < index_names.size(); ++i) {
+                stmt = For::make(index_names[i], 0, call->args[(i+2)*2 + 1],
                                  ForType::Serial, DeviceAPI::None, stmt);
             }
         }
@@ -1699,7 +1701,9 @@ Stmt optimize_hexagon_shuffles(Stmt s, int lut_alignment) {
 
 Stmt optimize_hexagon_instructions(Stmt s) {
     // For multi-dimensional prefetches, reduce it to 1D/2D prefetches.
+    debug(1) << "Reduce prefetch dimension...\n";
     s = reduce_prefetch_dimension(s);
+    debug(2) << "Lowering after reduce prefetch dimension:\n" << s << "\n";
 
     // Peephole optimize for Hexagon instructions. These can generate
     // interleaves and deinterleaves alongside the HVX intrinsics.
