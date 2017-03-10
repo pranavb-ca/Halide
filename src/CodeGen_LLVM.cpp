@@ -2706,7 +2706,7 @@ void CodeGen_LLVM::visit(const Call *op) {
         llvm::CallInst *call = builder->CreateCall(base_fn->getFunctionType(), phi, call_args);
         value = call;
     } else if (op->is_intrinsic(Call::prefetch)) {
-        // TODO(psuriana): implement this
+        // TODO(psuriana): Implement this
         // Convert to a no-op since prefetch was not supported by target
         value = ConstantInt::get(i32_t, 0);
     } else if (op->is_intrinsic(Call::signed_integer_overflow)) {

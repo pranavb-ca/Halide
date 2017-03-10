@@ -484,8 +484,8 @@ private:
     }
 
     void visit(const Prefetch *op) {
-        // TODO(psuriana): check if this works
         stream << open_span("Prefetch");
+        stream << keyword("prefetch") << " ";
         stream << var(op->name);
         stream << matched("(");
         for (size_t i = 0; i < op->bounds.size(); i++) {

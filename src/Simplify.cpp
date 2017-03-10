@@ -4239,6 +4239,45 @@ private:
             } else {
                 expr = op;
             }
+        } else if (op->is_intrinsic(Call::prefetch)) {
+            // Collapse the prefetched region into lower dimension whenever is applicable.
+            // TODO(psuriana): Deal with negative strides and overlaps.
+            IRMutator::visit(op);
+            op = expr.as<Call>();
+            internal_assert(op && op->is_intrinsic(Call::prefetch));
+
+            vector<Expr> args = op->args;
+            for (size_t i = 1; i < args.size(); i += 2) {
+                Expr extent_0 = args[i];
+                Expr stride_0 = args[i + 1];
+                for (size_t j = 1; j < args.size(); j+= 2) {
+                    if (i == j) {
+                        continue;
+                    }
+                    Expr extent_1 = args[j];
+                    Expr stride_1 = args[j + 1];
+
+                    if (can_prove(extent_0 * stride_0 == stride_1) || can_prove(extent_1 * stride_1 == stride_0)) {
+                        Expr new_extent = mutate(extent_0 * extent_1);
+                        const IntImm *int_stride_0 = stride_0.as<IntImm>();
+                        const IntImm *int_stride_1 = stride_1.as<IntImm>();
+                        Expr new_stride = 1;
+                        if (int_stride_0 && int_stride_1) {
+                            new_stride = gcd(int_stride_0->value, int_stride_1->value);
+                        }
+                        args.erase(args.begin() + j, args.begin() + j + 2);
+                        args[i] = new_extent;
+                        args[i + 1] = new_stride;
+                        i -= 2;
+                        break;
+                    }
+                }
+            }
+
+            if (args.size() != op->args.size()) {
+                internal_assert(args.size() < op->args.size());
+                expr = Call::make(op->type, Call::prefetch, args, Call::Intrinsic);
+            }
         } else {
             IRMutator::visit(op);
         }

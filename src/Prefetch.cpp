@@ -42,7 +42,7 @@ private:
     using IRMutator::visit;
 
     const vector<PrefetchDirective> &get_prefetch_list(const string &loop_name) {
-        if (!current_func || starts_with(loop_name, current_func->name() + ".s" + std::to_string(stage))) {
+        if (!current_func || !starts_with(loop_name, current_func->name() + ".s" + std::to_string(stage))) {
             vector<string> v = split_string(loop_name, ".");
             internal_assert(v.size() > 2);
             const string &func_name = v[0];
@@ -167,13 +167,14 @@ private:
                 map<string, Box> boxes_rw = boxes_touched(body, scope);
                 scope.pop(op->name);
 
-                // TODO: Only prefetch the newly accessed data from the previous iteration.
-                // We should subtract the box accessed to the one accessed during previous
-                // iteration.
+                // TODO(psuriana): Only prefetch the newly accessed data. We
+                // should subtract the box accessed during previous iteration
+                // from the one accessed during this iteration.
 
-                // TODO(psuriana): shift the start address of the prefetch boxes
-                // instead of intersecting the extent with the bounds to ensure
-                // the extents to be constants.
+                // TODO(psuriana): Shift the base address of the prefetched box
+                // instead of intersecting the extents with the bounds to simplify
+                // the extent exprs. We may have a higher chance a collapsing the
+                // box this way.
                 const auto &b = boxes_rw.find(p.name);
                 if (b != boxes_rw.end()) {
                     // Only prefetch the region that is in bounds.

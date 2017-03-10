@@ -1496,7 +1496,6 @@ void CodeGen_Hexagon::visit(const Call *op) {
     }
 
     if (op->is_intrinsic(Call::prefetch)) {
-        debug(0) << "GET HERE\n";
         internal_assert((op->args.size() == 3) || (op->args.size() == 5))
             << "Hexagon only supports 1D or 2D prefetch\n";
 

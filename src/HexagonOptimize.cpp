@@ -71,7 +71,13 @@ class ReducePrefetchDimension : public IRMutator {
         internal_assert(op);
         const Call *call = op->value.as<Call>();
 
-        // Reduce the prefetch dimension if bigger than 2
+        // Reduce the prefetch dimension if bigger than 2. The halide hexagon
+        // runtime assumes one of the dimensions has stride of 1.
+        //
+        // TODO(psuriana): Ideally, we want to keep the loop size minimal to
+        // minimize the number of prefetch calls. We probably want to lift
+        // the dimensions with larger strides and keep the smaller ones in
+        // the prefetch call.
         if (call && call->is_intrinsic(Call::prefetch) && (call->args.size() > 5)) {
             const Call *base_addr = call->args[0].as<Call>();
             internal_assert(base_addr && base_addr->is_intrinsic(Call::address_of));

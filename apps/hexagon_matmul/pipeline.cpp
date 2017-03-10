@@ -81,7 +81,6 @@ public:
 
                 AB.update(0)
                     .prefetch(A, rk, 2)
-                    //.prefetch(B_swizzled, rk, 2)
                     .reorder(x, y, rk)
                     .vectorize(x)
                     .unroll(y)
