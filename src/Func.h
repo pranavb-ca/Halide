@@ -42,6 +42,7 @@ struct VarOrRVar {
 };
 
 class ImageParam;
+template<typename T> class Input;
 
 namespace Internal {
 struct Split;
@@ -282,6 +283,8 @@ public:
     EXPORT Stage &hexagon(VarOrRVar x = Var::outermost());
     EXPORT Stage &prefetch(const Func &f, VarOrRVar var, Expr offset = 1);
     EXPORT Stage &prefetch(const ImageParam &image, VarOrRVar var, Expr offset = 1);
+    template<typename T>
+    EXPORT Stage &prefetch(const Input<Buffer<T>> &image, VarOrRVar var, Expr offset = 1);
     // @}
 };
 
@@ -1533,6 +1536,8 @@ public:
     // @{
     EXPORT Func &prefetch(const Func &f, VarOrRVar var, Expr offset = 1);
     EXPORT Func &prefetch(const ImageParam &image, VarOrRVar var, Expr offset = 1);
+    template<typename T>
+    EXPORT Func &prefetch(const Input<Buffer<T>> &image, VarOrRVar var, Expr offset = 1);
     // @}
 
     /** Specify how the storage for the function is laid out. These

@@ -31,6 +31,7 @@
 #include "Associativity.h"
 #include "ApplySplit.h"
 #include "ImageParam.h"
+#include "Generator.h"
 
 namespace Halide {
 
@@ -1722,6 +1723,13 @@ Stage &Stage::prefetch(const ImageParam &image, VarOrRVar var, Expr offset) {
     return *this;
 }
 
+template<typename T>
+Stage &Stage::prefetch(const Input<Buffer<T>> &image, VarOrRVar var, Expr offset) {
+    PrefetchDirective prefetch = {image.name(), var.name(), offset, image.parameter()};
+    definition.schedule().prefetches().push_back(prefetch);
+    return *this;
+}
+
 void Func::invalidate_cache() {
     if (pipeline_.defined()) {
         pipeline_.invalidate_cache();
@@ -2195,6 +2203,13 @@ Func &Func::prefetch(const Func &f, VarOrRVar var, Expr offset) {
 }
 
 Func &Func::prefetch(const ImageParam &image, VarOrRVar var, Expr offset) {
+    invalidate_cache();
+    Stage(func.definition(), name(), args(), func.schedule().storage_dims()).prefetch(image, var, offset);
+    return *this;
+}
+
+template<typename T>
+Func &Func::prefetch(const Input<Buffer<T>> &image, VarOrRVar var, Expr offset) {
     invalidate_cache();
     Stage(func.definition(), name(), args(), func.schedule().storage_dims()).prefetch(image, var, offset);
     return *this;
