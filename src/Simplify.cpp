@@ -4875,6 +4875,30 @@ private:
         }
     }
 
+    void visit(const Evaluate *op) {
+        Expr value = op->value;
+
+        // Gather all the let exprs
+        vector<pair<string, Expr>> lets;
+        while (const Let *let = value.as<Let>()) {
+            value = let->body;
+            lets.push_back({let->name, let->value});
+        }
+
+        value = mutate(value);
+
+        if (value.same_as(op->value)) {
+            internal_assert(lets.empty());
+            stmt = op;
+        } else {
+            // Rewrap the lets outside the evaluate node
+            stmt = Evaluate::make(value);
+            for (size_t i = lets.size(); i > 0; i--) {
+                stmt = LetStmt::make(lets[i-1].first, lets[i-1].second, stmt);
+            }
+        }
+    }
+
     void visit(const ProducerConsumer *op) {
         Stmt body = mutate(op->body);
 
@@ -6253,6 +6277,10 @@ void simplify_test() {
     // Check that dead lets get stripped
     check(Let::make("x", 3*y*y*y, 4), 4);
     check(Let::make("x", 0, 0), 0);
+
+    // Check that lets inside an evaluate node get lifted
+    check(Evaluate::make(Let::make("x", 10, x + 2)),
+          LetStmt::make("x", 10, Evaluate::make(x + 2)));
 
     // Test case with most negative 32-bit number, as constant to check that it is not negated.
     check(((x * (int32_t)0x80000000) + (y + z * (int32_t)0x80000000)),

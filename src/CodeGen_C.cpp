@@ -1152,6 +1152,9 @@ void CodeGen_C::visit(const Call *op) {
         user_error << "Signed integer overflow occurred during constant-folding. Signed"
             " integer overflow for int32 and int64 is undefined behavior in"
             " Halide.\n";
+    } else if (op->is_intrinsic(Call::prefetch)) {
+        // TODO(psuriana): Implement this
+        user_error << "Prefetch call is not currenly supported\n";
     } else if (op->is_intrinsic(Call::indeterminate_expression)) {
         user_error << "Indeterminate expression occurred during constant-folding.\n";
     } else if (op->call_type == Call::Intrinsic ||
@@ -1449,7 +1452,7 @@ void CodeGen_C::visit(const Realize *op) {
 }
 
 void CodeGen_C::visit(const Prefetch *op) {
-    // TODO(psuriana): add the runtime
+    internal_error << "Cannot emit prefetch statements to C\n";
 }
 
 void CodeGen_C::visit(const IfThenElse *op) {

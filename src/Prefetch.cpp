@@ -3,9 +3,10 @@
 #include <string>
 
 #include "Prefetch.h"
-#include "IRMutator.h"
 #include "Bounds.h"
+#include "IRMutator.h"
 #include "Scope.h"
+#include "Simplify.h"
 #include "Util.h"
 
 namespace Halide {
@@ -197,10 +198,67 @@ private:
     }
 };
 
+class ReducePrefetchDimension : public IRMutator {
+    using IRMutator::visit;
+
+    int max_dim;
+
+    void visit(const Evaluate *op) {
+        IRMutator::visit(op);
+        op = stmt.as<Evaluate>();
+        internal_assert(op);
+        const Call *call = op->value.as<Call>();
+
+        // Reduce the prefetch dimension if bigger than 'max_dim'.
+        // TODO(psuriana): Ideally, we want to keep the loop size minimal to
+        // minimize the number of prefetch calls. We probably want to lift
+        // the dimensions with larger strides and keep the smaller ones in
+        // the prefetch call.
+
+        size_t max_arg_size = 1 + 2 * max_dim; // Prefetch: {base, extent0, stride0, extent1, stride1, ...}
+        if (call && call->is_intrinsic(Call::prefetch) && (call->args.size() > max_arg_size)) {
+            const Call *base_addr = call->args[0].as<Call>();
+            internal_assert(base_addr && base_addr->is_intrinsic(Call::address_of));
+            const Load *base = base_addr->args[0].as<Load>();
+            internal_assert(base);
+
+            vector<string> index_names;
+            Expr offset = 0;
+            for (size_t i = max_arg_size; i < call->args.size(); i += 2) {
+                Expr stride = call->args[i+1];
+                string index_name = "prefetch_" + call->name + "." + std::to_string((i-1)/2);
+                index_names.push_back(index_name);
+                offset += Variable::make(Int(32), index_name) * stride;
+            }
+            Expr new_base = Load::make(base->type, base->name, simplify(base->index + offset),
+                                       base->image, base->param, base->predicate);
+            Expr new_base_addr = Call::make(Handle(), Call::address_of, {new_base}, Call::Intrinsic);
+
+            vector<Expr> args = {new_base_addr};
+            for (size_t i = 1; i < max_arg_size; ++i) {
+                args.push_back(call->args[i]);
+            }
+
+            stmt = Evaluate::make(Call::make(call->type, Call::prefetch, args, Call::Intrinsic));
+            for (size_t i = 0; i < index_names.size(); ++i) {
+                stmt = For::make(index_names[i], 0, call->args[(i+2)*2 + 1],
+                                 ForType::Serial, DeviceAPI::None, stmt);
+            }
+        }
+    }
+
+public:
+    ReducePrefetchDimension(int max_dim) : max_dim(max_dim) {}
+};
+
 } // namespace
 
 Stmt inject_prefetch(Stmt s, const map<string, Function> &env) {
     return InjectPrefetch(env).mutate(s);
+}
+
+Stmt reduce_prefetch_dimension(Stmt stmt, int max_dim) {
+    return ReducePrefetchDimension(max_dim).mutate(stmt);
 }
 
 }

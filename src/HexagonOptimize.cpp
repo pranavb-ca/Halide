@@ -11,6 +11,7 @@
 #include "Scope.h"
 #include "Bounds.h"
 #include "Lerp.h"
+#include "Prefetch.h"
 
 namespace Halide {
 namespace Internal {
@@ -59,62 +60,6 @@ bool is_native_deinterleave(Expr x) {
 }
 
 namespace {
-
-// This will reduce a multi-dimensional prefetch into a 2D prefetch. It keeps
-// the two innermost dimensions and adds loops for the rest of the dimensions.
-class ReducePrefetchDimension : public IRMutator {
-    using IRMutator::visit;
-
-    void visit(const Evaluate *op) {
-        IRMutator::visit(op);
-        op = stmt.as<Evaluate>();
-        internal_assert(op);
-        const Call *call = op->value.as<Call>();
-
-        // Reduce the prefetch dimension if bigger than 2. The halide hexagon
-        // runtime assumes one of the dimensions has stride of 1.
-        //
-        // TODO(psuriana): Ideally, we want to keep the loop size minimal to
-        // minimize the number of prefetch calls. We probably want to lift
-        // the dimensions with larger strides and keep the smaller ones in
-        // the prefetch call.
-        if (call && call->is_intrinsic(Call::prefetch) && (call->args.size() > 5)) {
-            const Call *base_addr = call->args[0].as<Call>();
-            internal_assert(base_addr && base_addr->is_intrinsic(Call::address_of));
-            const Load *base = base_addr->args[0].as<Load>();
-            internal_assert(base);
-
-            vector<string> index_names;
-            Expr offset = 0;
-            for (size_t i = 5; i < call->args.size(); i += 2) {
-                Expr stride = call->args[i+1];
-                string index_name = "prefetch_" + call->name + "." + std::to_string((i-1)/2);
-                index_names.push_back(index_name);
-                offset += Variable::make(Int(32), index_name) * stride;
-            }
-            Expr new_base = Load::make(base->type, base->name, simplify(base->index + offset),
-                                       base->image, base->param, base->predicate);
-            Expr new_base_addr = Call::make(Handle(), Call::address_of, {new_base}, Call::Intrinsic);
-
-            vector<Expr> args = {new_base_addr};
-            for (int i = 1; i < 5; ++i) {
-                args.push_back(call->args[i]);
-            }
-
-            stmt = Evaluate::make(Call::make(call->type, Call::prefetch, args, Call::Intrinsic));
-            for (size_t i = 0; i < index_names.size(); ++i) {
-                stmt = For::make(index_names[i], 0, call->args[(i+2)*2 + 1],
-                                 ForType::Serial, DeviceAPI::None, stmt);
-            }
-        }
-    }
-};
-
-Stmt reduce_prefetch_dimension(Stmt stmt) {
-    ReducePrefetchDimension reducer;
-    stmt = reducer.mutate(stmt);
-    return stmt;
-}
 
 // Broadcast to an unknown number of lanes, for making patterns.
 Expr bc(Expr x) { return Broadcast::make(x, 0); }
@@ -1708,7 +1653,7 @@ Stmt optimize_hexagon_shuffles(Stmt s, int lut_alignment) {
 Stmt optimize_hexagon_instructions(Stmt s) {
     // For multi-dimensional prefetches, reduce it to 1D/2D prefetches.
     debug(1) << "Reduce prefetch dimension...\n";
-    s = reduce_prefetch_dimension(s);
+    s = reduce_prefetch_dimension(s, 2);
     debug(2) << "Lowering after reduce prefetch dimension:\n" << s << "\n";
 
     // Peephole optimize for Hexagon instructions. These can generate
