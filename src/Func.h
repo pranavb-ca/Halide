@@ -280,11 +280,14 @@ public:
     EXPORT Stage &allow_race_conditions();
 
     EXPORT Stage &hexagon(VarOrRVar x = Var::outermost());
-    EXPORT Stage &prefetch(const Func &f, VarOrRVar var, Expr offset = 1);
-    EXPORT Stage &prefetch(const Internal::Parameter &param, VarOrRVar var, Expr offset = 1);
+    EXPORT Stage &prefetch(const Func &f, VarOrRVar var, Expr offset = 1,
+                           PrefetchBoundStrategy strategy = PrefetchBoundStrategy::GuardWithIf);
+    EXPORT Stage &prefetch(const Internal::Parameter &param, VarOrRVar var, Expr offset = 1,
+                           PrefetchBoundStrategy strategy = PrefetchBoundStrategy::GuardWithIf);
     template<typename T>
-    Stage &prefetch(const T &image, VarOrRVar var, Expr offset = 1) {
-        return prefetch(image.parameter(), var, offset);
+    Stage &prefetch(const T &image, VarOrRVar var, Expr offset = 1,
+                    PrefetchBoundStrategy strategy = PrefetchBoundStrategy::GuardWithIf) {
+        return prefetch(image.parameter(), var, offset, strategy);
     }
     // @}
 };
@@ -1535,11 +1538,14 @@ public:
      * currently only implemented on Hexagon, prefetch directives are
      * ignored on other targets. */
     // @{
-    EXPORT Func &prefetch(const Func &f, VarOrRVar var, Expr offset = 1);
-    EXPORT Func &prefetch(const Internal::Parameter &param, VarOrRVar var, Expr offset = 1);
+    EXPORT Func &prefetch(const Func &f, VarOrRVar var, Expr offset = 1,
+                          PrefetchBoundStrategy strategy = PrefetchBoundStrategy::GuardWithIf);
+    EXPORT Func &prefetch(const Internal::Parameter &param, VarOrRVar var, Expr offset = 1,
+                          PrefetchBoundStrategy strategy = PrefetchBoundStrategy::GuardWithIf);
     template<typename T>
-    Func &prefetch(const T &image, VarOrRVar var, Expr offset = 1) {
-        return prefetch(image.parameter(), var, offset);
+    Func &prefetch(const T &image, VarOrRVar var, Expr offset = 1,
+                   PrefetchBoundStrategy strategy = PrefetchBoundStrategy::GuardWithIf) {
+        return prefetch(image.parameter(), var, offset, strategy);
     }
     // @}
 

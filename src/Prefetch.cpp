@@ -179,9 +179,22 @@ private:
                 const auto &b = boxes_rw.find(p.name);
                 if (b != boxes_rw.end()) {
                     // Only prefetch the region that is in bounds.
+                    Box prefetch_box = b->second;
                     const Box &bounds = get_buffer_bounds(b->first, b->second.size());
-                    Box prefetch_box = box_intersection(b->second, bounds);
+                    internal_assert(prefetch_box.size() == bounds.size());
 
+                    if (p.strategy == PrefetchBoundStrategy::Clamp) {
+                        prefetch_box = box_intersection(prefetch_box, bounds);
+                    } else if (p.strategy == PrefetchBoundStrategy::GuardWithIf) {
+                        Expr predicate = const_true();
+                        for (size_t i = 0; i < bounds.size(); ++i) {
+                            predicate = predicate && (prefetch_box[i].min >= bounds[i].min) &&
+                                        (prefetch_box[i].max <= bounds[i].max);
+                        }
+                        prefetch_box.used = simplify(predicate);
+                    } else {
+                        internal_assert(p.strategy == PrefetchBoundStrategy::NonFaulting);
+                    }
                     body = add_prefetch(b->first, p.param, prefetch_box, body);
                 }
             }

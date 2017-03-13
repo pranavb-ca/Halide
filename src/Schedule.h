@@ -64,6 +64,22 @@ enum class TailStrategy {
     Auto
 };
 
+/** Different ways to handle accesses outside the original extents in a prefetch. */
+enum class PrefetchBoundStrategy {
+    /** Intersect the prefetched region with the original extents. This may
+     * make the exprs of the prefetched region more complicated. */
+    Clamp,
+
+    /** Guard the prefetch with an if statement that prevents prefetching region
+     * beyond the original extents. */
+    GuardWithIf,
+
+    /** Do nothing to the prefetched region. This may prefetch region outside
+     * the original extents. This is good if prefetch won't fault when
+     * accessing region outside the original extents. */
+    NonFaulting
+};
+
 /** A reference to a site in a Halide statement at the top of the
  * body of a particular for loop. Evaluating a region of a halide
  * function is done by generating a loop nest that spans its
@@ -196,6 +212,7 @@ struct PrefetchDirective {
     std::string name;
     std::string var;
     Expr offset;
+    PrefetchBoundStrategy strategy;
     // If it's a prefetch load from an image parameter, this points to that.
     Parameter param;
 };
