@@ -100,9 +100,9 @@ bin/%/halide_remote.o: halide_remote.cpp dlib.h
 	mkdir -p $(@D)
 	$(CXX-$*) $(CCFLAGS-$*) -fPIC -c halide_remote.cpp -I ${HEXAGON_QDEBUG_INCLUDES} -o $@
 
-bin/%/qdebug_dump_reg_asm.o: qdebug_asm.h qdebug_dump_reg_asm.S
+bin/%/qdebug_dump_reg_asm.o: qdebug_asm.h qdebug_dump_reg_asm.s
 	mkdir -p $(@D)
-	$(CXX-$*) $(CCFLAGS-$*) -fPIC -c qdebug_dump_reg_asm.S -I ${HEXAGON_QDEBUG_INCLUDES} -o $@
+	$(CXX-$*) $(CCFLAGS-$*) -fPIC -c qdebug_dump_reg_asm.s -I ${HEXAGON_QDEBUG_INCLUDES} -o $@
 
 bin/%/dlib.o: dlib.cpp dlib.h
 	mkdir -p $(@D)
