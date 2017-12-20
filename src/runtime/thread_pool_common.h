@@ -130,6 +130,7 @@ WEAK void worker_thread_already_locked(work *owned_job) {
             halide_mutex_unlock(&work_queue.mutex);
             int result = halide_do_task(myjob.user_context, myjob.f, myjob.next,
                                         myjob.closure);
+            halide_mutex_init(&work_queue.mutex);
             halide_mutex_lock(&work_queue.mutex);
 
             // If this task failed, set the exit status on the job.
@@ -150,6 +151,7 @@ WEAK void worker_thread_already_locked(work *owned_job) {
 }
 
 WEAK void worker_thread(void *) {
+    halide_mutex_init(&work_queue.mutex);
     halide_mutex_lock(&work_queue.mutex);
     worker_thread_already_locked(NULL);
     halide_mutex_unlock(&work_queue.mutex);
@@ -175,6 +177,7 @@ WEAK int halide_default_do_par_for(void *user_context, halide_task_t f,
 
     // Grab the lock. If it hasn't been initialized yet, then the
     // field will be zero-initialized because it's a static global.
+    halide_mutex_init(&work_queue.mutex);
     halide_mutex_lock(&work_queue.mutex);
 
     if (!work_queue.initialized) {
@@ -260,6 +263,7 @@ WEAK int halide_set_num_threads(int n) {
     // Don't make this an atomic swap - we don't want to be changing
     // the desired number of threads while another thread is in the
     // middle of a sequence of non-atomic operations.
+    halide_mutex_init(&work_queue.mutex);
     halide_mutex_lock(&work_queue.mutex);
     if (n == 0) {
         n = default_desired_num_threads();
@@ -275,6 +279,7 @@ WEAK void halide_shutdown_thread_pool() {
 
     // Wake everyone up and tell them the party's over and it's time
     // to go home
+    halide_mutex_init(&work_queue.mutex);
     halide_mutex_lock(&work_queue.mutex);
     work_queue.shutdown = true;
     halide_cond_broadcast(&work_queue.wakeup_owners);

@@ -96,6 +96,7 @@ WEAK void sampling_profiler_thread(void *) {
     halide_profiler_state *s = halide_profiler_get_state();
 
     // grab the lock
+    halide_mutex_init(&s->lock);
     halide_mutex_lock(&s->lock);
 
     while (s->current_func != halide_profiler_please_stop) {
@@ -126,6 +127,7 @@ WEAK void sampling_profiler_thread(void *) {
             int sleep_ms = s->sleep_time;
             halide_mutex_unlock(&s->lock);
             halide_sleep_ms(NULL, sleep_ms);
+            halide_mutex_init(&s->lock);
             halide_mutex_lock(&s->lock);
         }
     }
